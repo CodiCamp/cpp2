@@ -13,6 +13,8 @@ and tell the linker to link with the .lib file.
 #include "driverChoice.h"
 
 using namespace irr;
+using namespace core;
+using namespace video;
 
 #ifdef _IRR_WINDOWS_
 #pragma comment(lib, "Irrlicht.lib")
@@ -25,135 +27,96 @@ a caption, and get a pointer to the video driver.
 */
 int main()
 {
-	// ask user for driver
-	/*video::E_DRIVER_TYPE driverType=driverChoiceConsole();
-	if (driverType==video::EDT_COUNT)
-		return 1;*/
+	int rocketAnimFrameSizeW = 55;
+	int rocketAnimFrameSizeH = 83;
 
 	// create device
-
 	IrrlichtDevice *device = createDevice(video::EDT_DIRECT3D9,
 		core::dimension2d<u32>(800, 600));
 
 	if (device == 0)
 		return 1; // could not create selected driver.
 
-	device->setWindowCaption(L"Irrlicht Engine - 2D Graphics Demo");
-
 	video::IVideoDriver* driver = device->getVideoDriver();
+	
+	
+	video::ITexture* image = driver->getTexture("./media/Rocket_spritesheet.png");
+	driver->makeColorKeyTexture(image, position2d<s32>(0, 0));
 
-	/*
-	All 2d graphics in this example are put together into one texture,
-	2ddemo.png. Because we want to draw colorkey based sprites, we need to
-	load this texture and tell the engine, which part of it should be
-	transparent based on a colorkey.
+	video::ITexture* bgrnd = driver->getTexture("./media/Background_Purple_Space-800x600.jpg");
+	//driver->makeColorKeyTexture(bgrnd, position2d<s32>(0, 0));
+	
+	video::ITexture* sun = driver->getTexture("./media/sunAnim.PNG");
+	driver->makeColorKeyTexture(sun, position2d<s32>(0, 0));
 
-	In this example, we don't tell it the color directly, we just say "Hey
-	Irrlicht Engine, you'll find the color I want at position (0,0) on the
-	texture.". Instead, it would be also possible to call
-	driver->makeColorKeyTexture(images, video::SColor(0,0,0,0)), to make
-	e.g. all black pixels transparent. Please note that
-	makeColorKeyTexture just creates an alpha channel based on the color.
-	*/
-	video::ITexture* images = driver->getTexture("./media/2ddemo.png");
-	driver->makeColorKeyTexture(images, core::position2d<s32>(0,0));
 
-	/*
-	To be able to draw some text with two different fonts, we first load
-	them. Ok, we load just one. As the first font we just use the default
-	font which is built into the engine. Also, we define two rectangles
-	which specify the position of the images of the red imps (little flying
-	creatures) in the texture.
-	*/
-	gui::IGUIFont* font = device->getGUIEnvironment()->getBuiltInFont();
-	gui::IGUIFont* font2 =
-		device->getGUIEnvironment()->getFont("./media/fonthaettenschweiler.bmp");
+	int currentColumn = 0;
+	int row = 0;
+	int LastFps = -1;
 
-	core::rect<s32> imp1(349,15,385,78);
-	core::rect<s32> imp2(387,15,423,78);
+	u32 lastTime = device->getTimer()->getTime();
+	u32 lastAnimationFrame = device->getTimer()->getTime();
+	u32 lastSunFrame = device->getTimer()->getTime();
+	int previousFrame = 0;
 
-	/*
-	Prepare a nicely filtering 2d render mode for special cases.
-	*/
-	driver->getMaterial2D().TextureLayer[0].BilinearFilter=true;
-	driver->getMaterial2D().AntiAliasing=video::EAAM_FULL_BASIC;
-
-	/*
-	Everything is prepared, now we can draw everything in the draw loop,
-	between the begin scene and end scene calls. In this example, we are
-	just doing 2d graphics, but it would be no problem to mix them with 3d
-	graphics. Just try it out, and draw some 3d vertices or set up a scene
-	with the scene manager and draw it.
-	*/
-	while(device->run() && driver)
+	int sunFrame = 0;
+	while (device->run())
 	{
-		if (device->isWindowActive())
+		u32 currentTime = device->getTimer()->getTime();
+		u32 Dt = currentTime - lastTime;
+		//compute how much time has passed since previous frame. If it is > the time between animation frames, curentframe++
+		if (currentTime - lastAnimationFrame >= (1000/60))
 		{
-			u32 time = device->getTimer()->getTime();
+			currentColumn++;
+			lastAnimationFrame = currentTime;
 
-			driver->beginScene(true, true, video::SColor(255,120,102,136));
+		}
+		if (currentColumn >= 10)
+		{
+			currentColumn = 0;
+			row++;
+		}
+		if (row >= 6) row = 0;
 
-			/*
-			First, we draw 3 sprites, using the alpha channel we
-			created with makeColorKeyTexture. The last parameter
-			specifies that the drawing method should use this alpha
-			channel. The last-but-one parameter specifies a
-			color, with which the sprite should be colored.
-			(255,255,255,255) is full white, so the sprite will
-			look like the original. The third sprite is drawn
-			with the red channel modulated based on the time.
-			*/
+		//sun animation
+		if (currentTime - lastSunFrame >= (1000 / 5))
+		{
+			sunFrame++;
+			lastSunFrame = currentTime;
+		}
+		if (sunFrame >= 5)
+		{
+			sunFrame = 0;
+		}
+	
+		driver->beginScene(true, true, SColor(255, 200, 200, 200));
+		
+			driver->draw2DImage(bgrnd, position2d<s32>(0, 0),
+				rect<s32>(0, 0,
+				800, 600), 0,
+				SColor(255, 255, 255, 255),true);
 
-			// draw fire & dragons background world
-			driver->draw2DImage(images, core::position2d<s32>(50,50),
-				core::rect<s32>(0,0,342,224), 0,
-				video::SColor(255,255,255,255), true);
+			driver->draw2DImage(sun, position2d<s32>(300, 200),
+				rect<s32>(sunFrame * 200, 0,
+				(sunFrame + 1) * 200, 200), 0,
+				SColor(255, 255, 255, 255), true);
 
-			// draw flying imp
-			driver->draw2DImage(images, core::position2d<s32>(164,125),
-				(time/500 % 2) ? imp1 : imp2, 0,
-				video::SColor(255,255,255,255), true);
+			driver->draw2DImage(image, position2d<s32>(30, 50),
+				rect<s32>(currentColumn * rocketAnimFrameSizeW, row * rocketAnimFrameSizeH,
+				(currentColumn + 1) * rocketAnimFrameSizeW, (row + 1) * rocketAnimFrameSizeH), 0,
+				SColor(255, 255, 255, 255), true);
+			
+		driver->endScene();
+		lastTime = currentTime;
 
-			// draw second flying imp with colorcylce
-			driver->draw2DImage(images, core::position2d<s32>(270,105),
-				(time/500 % 2) ? imp1 : imp2, 0,
-				video::SColor(255,255,255,255), true);
+		int fps = driver->getFPS();
 
-			/*
-			Drawing text is really simple. The code should be self
-			explanatory.
-			*/
-
-			// draw some text
-			if (font)
-				font->draw(L"This demo shows that Irrlicht is also capable of drawing 2D graphics.",
-					core::rect<s32>(130,10,300,50),
-					video::SColor(255,255,255,255));
-
-			// draw some other text
-			if (font2)
-				font2->draw(L"Also mixing with 3d graphics is possible.",
-					core::rect<s32>(130,20,300,60),
-					video::SColor(255,255,255,255));
-
-			/*
-			Next, we draw the Irrlicht Engine logo (without
-			using a color or an alpha channel). Since we slightly scale
-			the image we use the prepared filter mode.
-			*/
-			driver->enableMaterial2D();
-			driver->draw2DImage(images, core::rect<s32>(10,10,108,48),
-				core::rect<s32>(354,87,442,118));
-			driver->enableMaterial2D(false);
-
-			/*
-			Finally draw a half-transparent rect under the mouse cursor.
-			*/
-			core::position2d<s32> m = device->getCursorControl()->getPosition();
-			driver->draw2DRectangle(video::SColor(100,255,255,255),
-				core::rect<s32>(m.X-20, m.Y-20, m.X+20, m.Y+20));
-
-			driver->endScene();
+		if (LastFps != fps)
+		{
+			core::stringw stingFPS = L"FPS: ";
+			stingFPS += fps;
+			device->setWindowCaption(stingFPS.c_str());
+			LastFps = fps;
 		}
 	}
 
@@ -165,3 +128,4 @@ int main()
 /*
 That's all. I hope it was not too difficult.
 **/
+
