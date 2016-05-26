@@ -1,10 +1,15 @@
 #include <irrlicht.h>
+#include <ozcollide\ozcollide.h>
+#include <ozcollide\box.h>
+#include <ozcollide\sphere.h>
 #include "MyEventReceiver.h"
 using namespace std;
 
 using namespace irr;
 using namespace core;
 using namespace video;
+
+using namespace ozcollide;
 
 #ifdef _IRR_WINDOWS_
 #pragma comment(lib, "Irrlicht.lib")
@@ -16,13 +21,27 @@ using namespace video;
 At first, we let the user select the driver type, then start up the engine, set
 a caption, and get a pointer to the video driver.
 */
+
+void drawCollision(Box* box, IVideoDriver* driver)
+{
+	driver->draw2DLine(vector2d<s32>(box->getPoint(0).x, box->getPoint(0).y), vector2d<s32>(box->getPoint(1).x, box->getPoint(1).y), SColor(255, 255, 0, 0));
+	driver->draw2DLine(vector2d<s32>(box->getPoint(1).x, box->getPoint(1).y), vector2d<s32>(box->getPoint(3).x, box->getPoint(3).y), SColor(255, 255, 0, 0));
+	driver->draw2DLine(vector2d<s32>(box->getPoint(2).x, box->getPoint(2).y), vector2d<s32>(box->getPoint(3).x, box->getPoint(3).y), SColor(255, 255, 0, 0));
+	driver->draw2DLine(vector2d<s32>(box->getPoint(0).x, box->getPoint(0).y), vector2d<s32>(box->getPoint(6).x, box->getPoint(6).y), SColor(255, 255, 0, 0));
+	box->~Box();
+}
+
 int main()
 {
 	s32 rocketAnimFrameSizeW = 55;
 	s32 rocketAnimFrameSizeH = 83;
+	//create collision primitives
+	Box* rocketCollision = new Box();
+	Sphere* sunCollision = new Sphere();
 
-	//create an instance of the event receiver
+		//create an instance of the event receiver
 	MyEventReceiver receiver;
+	receiver.init();
 
 	// create device
 	IrrlichtDevice *device = createDevice(video::EDT_DIRECT3D9,
@@ -76,13 +95,20 @@ int main()
 
 	int sunFrame = 0;
 
-	f32 MOVEMENT_SPEED = 0.2f;
+	f32 MOVEMENT_SPEEDX = 0.05f;
+	f32 MOVEMENT_SPEEDX1 = 0.05f;
+	f32 MOVEMENT_SPEEDY = 0.05f;
+	f32 MOVEMENT_SPEEDY1 = 0.05f;
 
-	position2di RocketPosition(300,300);
+	f32 acceeration = 0.0005f;
 
+
+	position2df RocketPosition(300,300);
+	
 
 	while (device->run())
 	{
+		receiver.endEventProcess();
 		const u32 currentTime = device->getTimer()->getTime();
 		//u32 Dt = currentTime - lastTime;
 
@@ -94,34 +120,71 @@ int main()
 		sphere node around respectively. */
 //		core::vector3df nodePosition = node->getPosition();
 
-		/*switch (receiver.getKey())
+	
+		if (MOVEMENT_SPEEDX >= 2.0f)
+				MOVEMENT_SPEEDX = 2.0f;
+		if (MOVEMENT_SPEEDX <= 0.0f)
+				MOVEMENT_SPEEDX = 0.0f;
+		if (MOVEMENT_SPEEDY >= 2.0f)
+				MOVEMENT_SPEEDY = 2.0f;
+		if (MOVEMENT_SPEEDY <= 0.0f)
+				MOVEMENT_SPEEDY = 0.0f;
+		if (MOVEMENT_SPEEDX1 >= 2.0f)
+				MOVEMENT_SPEEDX1 = 2.0f;
+		if (MOVEMENT_SPEEDX1 <= 0.0f)
+				MOVEMENT_SPEEDX1 = 0.0f;
+		if (MOVEMENT_SPEEDY1 >= 2.0f)
+				MOVEMENT_SPEEDY1 = 2.0f;
+		if (MOVEMENT_SPEEDY1 <= 0.0f)
+				MOVEMENT_SPEEDY1 = 0.0f;
+		
+		if (receiver.keyDown(irr::KEY_KEY_W))
 		{
-		case irr::KEY_KEY_W: 
-			RocketPosition.Y -= MOVEMENT_SPEED * Dt; break;
-		case irr::KEY_KEY_S:
-			RocketPosition.Y += MOVEMENT_SPEED * Dt; break;
-		case irr::KEY_KEY_A: 
-			RocketPosition.X -= MOVEMENT_SPEED * Dt; break;
-		case irr::KEY_KEY_D:
-			RocketPosition.X += MOVEMENT_SPEED * Dt; break;
-		};*/
+			RocketPosition.Y -= (MOVEMENT_SPEEDY * Dt );
+			MOVEMENT_SPEEDY += acceeration * Dt;
+		}
+		if (receiver.keyUp(irr::KEY_KEY_W))
+		{
+			RocketPosition.Y -= (MOVEMENT_SPEEDY * Dt);
+			MOVEMENT_SPEEDY -= acceeration * Dt;
+		}
+		if (receiver.keyDown(irr::KEY_KEY_S))
+		{
+			RocketPosition.Y += (MOVEMENT_SPEEDY1 * Dt);
+			MOVEMENT_SPEEDY1 += acceeration * Dt;
+		}
+		if (receiver.keyUp(irr::KEY_KEY_S))
+		{
+			RocketPosition.Y += (MOVEMENT_SPEEDY1 * Dt);
+			MOVEMENT_SPEEDY1 -= acceeration * Dt;
+		}
+		if (receiver.keyDown(irr::KEY_KEY_A))
+		{
+			RocketPosition.X -= MOVEMENT_SPEEDX * Dt;
+			MOVEMENT_SPEEDX += acceeration * Dt;
+		}
+		if (receiver.keyUp(irr::KEY_KEY_A))
+		{
+			RocketPosition.X -= MOVEMENT_SPEEDX * Dt;
+			MOVEMENT_SPEEDX -= acceeration * Dt;
+		}
+		if (receiver.keyDown(irr::KEY_KEY_D))
+		{
+			RocketPosition.X += MOVEMENT_SPEEDX1 * Dt;
+			MOVEMENT_SPEEDX1 += acceeration * Dt;
+		}
+		if (receiver.keyUp(irr::KEY_KEY_D))
+		{
+			RocketPosition.X += MOVEMENT_SPEEDX1 * Dt;
+			MOVEMENT_SPEEDX1 -= acceeration * Dt;
+		}
 
-		if (receiver.IsKeyDown(irr::KEY_KEY_W))
-		{
-			RocketPosition.Y -= (MOVEMENT_SPEED * Dt);
-		}
-		if (receiver.IsKeyDown(irr::KEY_KEY_S))
-		{
-			RocketPosition.Y += (MOVEMENT_SPEED * Dt);
-		}
-		if (receiver.IsKeyDown(irr::KEY_KEY_A))
-		{
-			RocketPosition.X -= MOVEMENT_SPEED * Dt;
-		}
-		if (receiver.IsKeyDown(irr::KEY_KEY_D))
-		{
-			RocketPosition.X += MOVEMENT_SPEED * Dt;
-		}
+		//Set here, in  order to update
+		rocketCollision->setFromPoints(Vec3f(RocketPosition.X, RocketPosition.Y, 0),
+			Vec3f(RocketPosition.X + rocketAnimFrameSizeW, RocketPosition.Y + rocketAnimFrameSizeH, 0));
+		
+		sunCollision->center = Vec3f(250, 200, 0);
+		sunCollision->radius = 100.0f;
 
 //		node->setPosition(nodePosition);
 		
@@ -152,7 +215,7 @@ int main()
 		/* Check if keys W, S, A or D are being held down, and move the
 		sphere node around respectively. */
 		
-	
+		receiver.startEventProcess();
 
 		driver->beginScene(true, true, SColor(255, 113, 113, 133));
 
@@ -167,6 +230,8 @@ int main()
 				rect<s32>(sunFrame * 200, 0,
 				(sunFrame + 1) * 200, 200), 0,
 				SColor(255, 255, 255, 255), true);
+			
+			driver->draw2DLine(vector2d<s32>(300, 200), vector2d<s32>(400, 300), SColor(255, 0, 255, 0));
 
 		driver->draw2DImage(image, 
 			position2d<s32>((s32)RocketPosition.X, (s32)RocketPosition.Y),
@@ -174,6 +239,7 @@ int main()
 				(currentColumn + 1) * rocketAnimFrameSizeW, (row + 1) * rocketAnimFrameSizeH),0,
 				SColor(255, 255, 255, 255), true);
 		
+		drawCollision(rocketCollision, driver);
 		//smgr->addCameraSceneNode();
 		driver->endScene();
 
