@@ -3,11 +3,13 @@
 #include <ozcollide\box.h>
 #include <ozcollide\sphere.h>
 #include "MyEventReceiver.h"
+
 using namespace std;
 
 using namespace irr;
 using namespace core;
 using namespace video;
+using namespace gui;
 
 using namespace ozcollide;
 
@@ -22,6 +24,27 @@ At first, we let the user select the driver type, then start up the engine, set
 a caption, and get a pointer to the video driver.
 */
 
+enum states
+{
+	STATE_PATROLLING,
+	STATE_FIRING,
+	STATE_MOVING
+
+} currentState;
+
+double seeDistance = 300.0f;
+
+bool seePlayer(Box *enemyShip, Box *playerShip)
+{
+	double distx = enemyShip->center.x - playerShip->center.x;
+	double disty = enemyShip->center.y - playerShip->center.y;
+	double dist = sqrt(distx*distx + disty*disty);
+
+	if (dist <= seeDistance)
+		return true;
+	return false;
+}
+
 void drawCollision(Box* box, IVideoDriver* driver)
 {
 	driver->draw2DLine(vector2d<s32>(box->getPoint(0).x, box->getPoint(0).y), vector2d<s32>(box->getPoint(1).x, box->getPoint(1).y), SColor(255, 255, 0, 0));
@@ -31,12 +54,26 @@ void drawCollision(Box* box, IVideoDriver* driver)
 	box->~Box();
 }
 
+bool moveToPosition(double speed, position2df* enemyPosition, position2df lastPosition)
+{
+	double diffX = lastPosition.X - enemyPosition->X;
+	double diffY = lastPosition.Y - enemyPosition->Y;
+
+	enemyPosition->X += diffX*speed;
+	enemyPosition->Y += diffY*speed;
+
+	if (abs(diffX) >= 10 || abs(diffY) >= 10)
+		return true;
+	return false;
+}
 int main()
 {
 	s32 rocketAnimFrameSizeW = 55;
 	s32 rocketAnimFrameSizeH = 83;
 	//create collision primitives
 	Box* rocketCollision = new Box();
+	Box* enemyCollision = new Box();
+
 	Sphere* sunCollision = new Sphere();
 
 		//create an instance of the event receiver
@@ -45,7 +82,7 @@ int main()
 
 	// create device
 	IrrlichtDevice *device = createDevice(video::EDT_DIRECT3D9,
-		core::dimension2d<u32>(800, 600), 16, false, false, false, &receiver);
+		core::dimension2d<u32>(800, 600), 16, 0, false, false, &receiver);
 
 	if (device == 0)
 		return 1; // could not create selected driver.
@@ -57,12 +94,14 @@ int main()
 	video::ITexture* image = driver->getTexture("./media/Rocket_spritesheet.png");
 	//driver->makeColorKeyTexture(image, position2d<s32>(0, 0));
 
+	video::ITexture* enemy = driver->getTexture("./media/YWing.png");
+
 	video::ITexture* bgrnd = driver->getTexture("./media/Background_Purple_Space-800x600.jpg");
 	//driver->makeColorKeyTexture(bgrnd, position2d<s32>(0, 0));
 	
 	video::ITexture* sun = driver->getTexture("./media/sunAnim.PNG");
 	driver->makeColorKeyTexture(sun, position2d<s32>(0, 0));
-	
+
 	//create a scene node to manipulate
 	//scene::ISceneNode * node = smgr->addCubeSceneNode();
 	//if (node)
@@ -104,9 +143,19 @@ int main()
 
 
 	position2df RocketPosition(300,300);
-	
+	position2df lastPosition;
+	position2df *EnemyPosition = new position2df(20, 20);
 
-	while (device->run())
+
+	currentState = states::STATE_PATROLLING;
+	/*SLight *light = new SLight();
+	light->Position = vector3df(sunCollision->center.x,sunCollision->center.y,0);
+	light->CastShadows = true;
+	light->Radius = 300.0f;
+	light->AmbientColor = SColorf(202,123,23);
+	light->DiffuseColor = SColorf(230, 180, 23);*/
+
+	while (device->run() && !receiver.keyDown(irr::KEY_ESCAPE))
 	{
 		receiver.endEventProcess();
 		const u32 currentTime = device->getTimer()->getTime();
@@ -137,7 +186,7 @@ int main()
 				MOVEMENT_SPEEDY1 = 2.0f;
 		if (MOVEMENT_SPEEDY1 <= 0.0f)
 				MOVEMENT_SPEEDY1 = 0.0f;
-		
+	
 		if (receiver.keyDown(irr::KEY_KEY_W))
 		{
 			RocketPosition.Y -= (MOVEMENT_SPEEDY * Dt );
@@ -183,9 +232,16 @@ int main()
 		rocketCollision->setFromPoints(Vec3f(RocketPosition.X, RocketPosition.Y, 0),
 			Vec3f(RocketPosition.X + rocketAnimFrameSizeW, RocketPosition.Y + rocketAnimFrameSizeH, 0));
 		
-		sunCollision->center = Vec3f(250, 200, 0);
-		sunCollision->radius = 100.0f;
+		enemyCollision->setFromPoints(Vec3f(EnemyPosition->X, EnemyPosition->Y, 0),
+			Vec3f(EnemyPosition->X + 128.0f, EnemyPosition->Y + 128.0f, 0));
 
+		sunCollision->center = Vec3f(400, 300, 0);
+		sunCollision->radius = 50.0f;
+		
+		
+
+		//rocketCollision->isOverlap();
+		//driver->addDynamicLight(*light);
 //		node->setPosition(nodePosition);
 		
 		if (currentTime - lastAnimationFrame >= (1000/60))
@@ -231,16 +287,60 @@ int main()
 				(sunFrame + 1) * 200, 200), 0,
 				SColor(255, 255, 255, 255), true);
 			
-			driver->draw2DLine(vector2d<s32>(300, 200), vector2d<s32>(400, 300), SColor(255, 0, 255, 0));
-
+			
 		driver->draw2DImage(image, 
 			position2d<s32>((s32)RocketPosition.X, (s32)RocketPosition.Y),
 				rect<s32>(currentColumn * rocketAnimFrameSizeW, row * rocketAnimFrameSizeH,
 				(currentColumn + 1) * rocketAnimFrameSizeW, (row + 1) * rocketAnimFrameSizeH),0,
 				SColor(255, 255, 255, 255), true);
 		
+		driver->draw2DImage(enemy,
+			position2d<s32>((s32)EnemyPosition->X, (s32)EnemyPosition->Y),
+			rect<s32>(0, 0,
+			128.0f, 128.0f), 0,
+			SColor(255, 255, 255, 255), true);
+
 		drawCollision(rocketCollision, driver);
+		drawCollision(enemyCollision, driver);
+
+		switch (currentState)
+		{
+		case STATE_PATROLLING:
+			if (seePlayer(enemyCollision, rocketCollision))
+			{
+				currentState = STATE_FIRING;
+			}break;
+		case STATE_FIRING:
+			if (!seePlayer(enemyCollision, rocketCollision))
+			{
+				lastPosition = RocketPosition;
+				currentState = STATE_MOVING;
+				//TODO function to move to last known player position
+			}
+			else
+			{
+				driver->draw2DLine(vector2d<s32>(enemyCollision->center.x, enemyCollision->center.y), vector2d<s32>(rocketCollision->center.x, rocketCollision->center.y), SColor(255, 250, 250, 0));
+			}break;
+		case STATE_MOVING:
+		{
+			if (seePlayer(enemyCollision, rocketCollision))
+			{
+				currentState = STATE_FIRING;
+			}
+
+			else
+			{
+				if (!moveToPosition(0.0005*Dt, EnemyPosition, lastPosition))
+				{
+					currentState = STATE_PATROLLING;
+				}
+			}
+		}
+			break;
+
+		}
 		//smgr->addCameraSceneNode();
+		
 		driver->endScene();
 
 		int fps = driver->getFPS();
@@ -249,6 +349,8 @@ int main()
 		{
 			core::stringw stingFPS = L"FPS: ";
 			stingFPS += fps;
+			stingFPS += L" : ";
+			stingFPS += currentState;
 			device->setWindowCaption(stingFPS.c_str());
 			LastFps = fps;
 		}
